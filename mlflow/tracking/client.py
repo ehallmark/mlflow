@@ -45,12 +45,12 @@ class MlflowClient(object):
     def ranger_can_authorize_experiment_id(self, experiment_id, role='select'):
         rangerAccess = ranger.MLflowRangerAccess(user=self.get_user())
         rangerAccess.sync(role=role) # Place to optimize
-        return rangerAccess.canAccessExperiment(experiment_id=experiment_id):
+        return rangerAccess.canAccessExperiment(experiment_id=experiment_id)
 
     def ranger_can_authorize_create_experiment(self):
         rangerAccess = ranger.MLflowRangerAccess(user=self.get_user())
         rangerAccess.sync(role=role) # Place to optimize
-        return rangerAccess.canCreateExperiment():
+        return rangerAccess.canCreateExperiment()
 
     def get_run(self, run_id):
         """
