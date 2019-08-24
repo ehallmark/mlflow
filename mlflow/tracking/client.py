@@ -15,14 +15,14 @@ from mlflow.utils.validation import _validate_param_name, _validate_tag_name, _v
 from mlflow.entities import Param, Metric, RunStatus, RunTag, ViewType, ExperimentTag
 from mlflow.store.artifact_repository_registry import get_artifact_repository
 from mlflow.utils.mlflow_tags import MLFLOW_USER
-
+from mlflow.tracking import ranger
 
 class MlflowClient(object):
     """
     Client of an MLflow Tracking Server that creates and manages experiments and runs.
     """
 
-    def __init__(self, tracking_uri=None):
+    def __init__(self, tracking_uri=None, user=None):
         """
         :param tracking_uri: Address of local or remote tracking server. If not provided, defaults
                              to the service set by ``mlflow.tracking.set_tracking_uri``. See
@@ -30,7 +30,27 @@ class MlflowClient(object):
                              for more info.
         """
         self.tracking_uri = tracking_uri or utils.get_tracking_uri()
+        self.user = user or os.environ.get('MLFLOW_RANGER_USER', 'mlflow')
+        os.environ['MLFLOW_RANGER_USER'] = self.user
         self.store = utils._get_store(self.tracking_uri)
+
+    def set_user(self, user):
+        self.user = user
+        os.environ['MLFLOW_RANGER_USER'] = user
+
+    def get_user(self):
+        self.user = os.environ.get('MLFLOW_RANGER_USER', self.user)
+        return self.user
+
+    def ranger_can_authorize_experiment_id(self, experiment_id, role='select'):
+        rangerAccess = ranger.MLflowRangerAccess(user=self.get_user())
+        rangerAccess.sync(role=role) # Place to optimize
+        return rangerAccess.canAccessExperiment(experiment_id=experiment_id):
+
+    def ranger_can_authorize_create_experiment(self):
+        rangerAccess = ranger.MLflowRangerAccess(user=self.get_user())
+        rangerAccess.sync(role=role) # Place to optimize
+        return rangerAccess.canCreateExperiment():
 
     def get_run(self, run_id):
         """
@@ -75,6 +95,10 @@ class MlflowClient(object):
         :return: :py:class:`mlflow.entities.Run` that was created.
         """
 
+        if not self.ranger_can_authorize_experiment_id(experiment_id, 'write'):
+            print("Access denied.")
+            raise
+
         tags = tags if tags else {}
 
         # Extract user from tags
@@ -91,6 +115,11 @@ class MlflowClient(object):
 
     def list_run_infos(self, experiment_id, run_view_type=ViewType.ACTIVE_ONLY):
         """:return: List of :py:class:`mlflow.entities.RunInfo`"""
+
+        if not self.ranger_can_authorize_experiment_id(experiment_id):
+            print("Access denied.")
+            raise
+
         return self.store.list_run_infos(experiment_id, run_view_type)
 
     def list_experiments(self, view_type=None):
@@ -98,13 +127,20 @@ class MlflowClient(object):
         :return: List of :py:class:`mlflow.entities.Experiment`
         """
         final_view_type = ViewType.ACTIVE_ONLY if view_type is None else view_type
-        return self.store.list_experiments(view_type=final_view_type)
+        experiments = self.store.list_experiments(view_type=final_view_type)
+        experiments = [exp for exp in experiments if self.ranger_can_authorize_experiment_id(exp.experiment_id)]
+        return experiments
+
 
     def get_experiment(self, experiment_id):
         """
         :param experiment_id: The experiment ID returned from ``create_experiment``.
         :return: :py:class:`mlflow.entities.Experiment`
         """
+        if not self.ranger_can_authorize_experiment_id(experiment_id):
+            print("Access denied.")
+            raise
+
         return self.store.get_experiment(experiment_id)
 
     def get_experiment_by_name(self, name):
@@ -112,7 +148,11 @@ class MlflowClient(object):
         :param name: The experiment name.
         :return: :py:class:`mlflow.entities.Experiment`
         """
-        return self.store.get_experiment_by_name(name)
+        experiment = self.store.get_experiment_by_name(name)
+        if not self.ranger_can_authorize_experiment_id(experiment.experiment_id):
+            print("Access denied.")
+            raise
+        return experiment
 
     def create_experiment(self, name, artifact_location=None):
         """Create an experiment.
@@ -122,6 +162,9 @@ class MlflowClient(object):
                                   If not provided, the server picks an appropriate default.
         :return: Integer ID of the created experiment.
         """
+        if not self.ranger_can_authorize_create_experiment():
+            print("Access denied.")
+            raise
         _validate_experiment_name(name)
         _validate_experiment_artifact_location(artifact_location)
         return self.store.create_experiment(
@@ -135,6 +178,9 @@ class MlflowClient(object):
 
         :param experiment_id: The experiment ID returned from ``create_experiment``.
         """
+        if not self.ranger_can_authorize_experiment_id(experiment_id, 'drop'):
+            print("Access denied.")
+            raise
         self.store.delete_experiment(experiment_id)
 
     def restore_experiment(self, experiment_id):
@@ -143,6 +189,9 @@ class MlflowClient(object):
 
         :param experiment_id: The experiment ID returned from ``create_experiment``.
         """
+        if not self.ranger_can_authorize_experiment_id(experiment_id, 'create'):
+            print("Access denied.")
+            raise
         self.store.restore_experiment(experiment_id)
 
     def rename_experiment(self, experiment_id, new_name):
@@ -151,6 +200,9 @@ class MlflowClient(object):
 
         :param experiment_id: The experiment ID returned from ``create_experiment``.
         """
+        if not self.ranger_can_authorize_experiment_id(experiment_id, 'update'):
+            print("Access denied.")
+            raise
         self.store.rename_experiment(experiment_id, new_name)
 
     def log_metric(self, run_id, key, value, timestamp=None, step=None):
@@ -186,6 +238,9 @@ class MlflowClient(object):
         :param key: Name of the tag.
         :param value: Tag value (converted to a string).
         """
+        if not self.ranger_can_authorize_experiment_id(experiment_id, 'update'):
+            print("Access denied.")
+            raise
         _validate_tag_name(key)
         tag = ExperimentTag(key, str(value))
         self.store.set_experiment_tag(experiment_id, tag)
@@ -337,6 +392,10 @@ class MlflowClient(object):
         """
         if isinstance(experiment_ids, int) or isinstance(experiment_ids, str):
             experiment_ids = [experiment_ids]
+        for experiment_id in experiment_ids:
+            if not self.ranger_can_authorize_experiment_id(experiment_id, 'select'):
+                print("Access denied.")
+                raise
         return self.store.search_runs(experiment_ids=experiment_ids, filter_string=filter_string,
                                       run_view_type=run_view_type, max_results=max_results,
                                       order_by=order_by, page_token=page_token)
