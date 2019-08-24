@@ -26,7 +26,7 @@ VALUES = 'values'
 VALUE_EXPRESSION = 'valueExpr'
 TYPE = 'type'
 IS_ALLOWED = 'isAllowed'
-DEBUG = True #False
+DEBUG = False #False
 
 class MLflowRangerAccess:
     def __init__(self, user):
@@ -43,7 +43,8 @@ class MLflowRangerAccess:
     def sync(self,role='select', url='http://ranger-admin.kubeflow.svc.cluster.local:6080/service/public/v2/api/service/primary_hive/policy'):
         policies = get_ranger_policies_for(self.user, url=url, admin_user='admin', admin_pass='Ranger123', database='mlflow')
         for policy in policies:
-            print('Found policy: ', policy)
+            if DEBUG:
+                print('Found policy: ', policy)
             if POLICY_ITEMS in policy:
                 filter_policies = policy[POLICY_ITEMS]
                 for filter_policy in filter_policies:
@@ -65,7 +66,8 @@ class MLflowRangerAccess:
                                             self.acceptAllExperiments = True
                                 if (access[TYPE] == 'create' or access[TYPE]=='all') and access[IS_ALLOWED]:
                                     self.canCreate = True
-                                    print('Can create experiments!')
+                                    if DEBUG:
+                                        print('Can create experiments!')
 
 
             if DENY_POLICY_ITEMS in policy:
