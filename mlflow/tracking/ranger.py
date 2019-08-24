@@ -95,7 +95,7 @@ class MLflowRangerAccess:
             return experiment_id not in self.denyExperimentIds
         if self.denyAllExperiments:
             return experiment_id in self.acceptExperimentIds
-        return return experiment_id in self.acceptExperimentIds
+        return experiment_id in self.acceptExperimentIds
 
     def canAccessRun(self, run_id):
         return run_id in self.acceptRunIds
