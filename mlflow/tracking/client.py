@@ -14,6 +14,7 @@ from mlflow.utils.validation import _validate_param_name, _validate_tag_name, _v
 from mlflow.entities import Param, Metric, RunStatus, RunTag, ViewType
 from mlflow.store.artifact_repository_registry import get_artifact_repository
 from mlflow.utils.mlflow_tags import MLFLOW_USER
+from mlflow.tracking import ranger
 
 
 class MlflowClient(object):
