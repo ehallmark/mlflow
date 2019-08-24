@@ -33,6 +33,10 @@ class MLflowRangerAccess:
         self.user = user
         self.acceptExperimentIds = set([])
         self.acceptRunIds = set([])
+        self.denyExperimentIds = set([])
+        self.denyRunIds = set([])
+        self.acceptAllExperiments = False
+        self.denyAllExperiments = False
         self.canCreate = False
 
 
@@ -47,18 +51,21 @@ class MLflowRangerAccess:
                         print('Found filter policy: ', filter_policy)
                     if ACCESSES in filter_policy:
                         accesses = filter_policy[ACCESSES]
-                        experiments = policy[RESOURCES][TABLE][VALUES]
-                        runs = policy[RESOURCES][COLUMN][VALUES]
-                        for access in accesses:
-                            if (access[TYPE] == role or access[TYPE]=='all') and access[IS_ALLOWED]:
-                                for experiment in experiments:
-                                    if experiment is not None and experiment != '*':
-                                        if DEBUG:
-                                            print('Accepting experiment: ', experiment)
-                                        self.acceptExperimentIds.add(experiment)
-                            if (access[TYPE] == 'create' or access[TYPE]=='all') and access[IS_ALLOWED]:
-                                self.canCreate = True
-                                print('Can create experiments!')
+                        if TABLE in policy[RESOURCES]:
+                            experiments = policy[RESOURCES][TABLE][VALUES]
+                            runs = policy[RESOURCES][COLUMN][VALUES]
+                            for access in accesses:
+                                if (access[TYPE] == role or access[TYPE]=='all') and access[IS_ALLOWED]:
+                                    for experiment in experiments:
+                                        if experiment is not None and experiment != '*':
+                                            if DEBUG:
+                                                print('Accepting experiment: ', experiment)
+                                            self.acceptExperimentIds.add(experiment)
+                                        elif experiment is not None and experiment == '*':
+                                            self.acceptAllExperiments = True
+                                if (access[TYPE] == 'create' or access[TYPE]=='all') and access[IS_ALLOWED]:
+                                    self.canCreate = True
+                                    print('Can create experiments!')
 
 
             if DENY_POLICY_ITEMS in policy:
@@ -68,19 +75,27 @@ class MLflowRangerAccess:
                         print('Found deny filter policy: ', filter_policy)
                     if ACCESSES in filter_policy:
                         accesses = filter_policy[ACCESSES]
-                        experiments = policy[RESOURCES][TABLE][VALUES]
-                        runs = policy[RESOURCES][COLUMN][VALUES]
-                        for access in accesses:
-                            if access[TYPE] == role and access[IS_ALLOWED]:
-                                for experiment in experiments:
-                                    if experiment is not None and experiment != '*':
-                                        if DEBUG:
-                                            print('Denying experiment: ', experiment)
-                                        if experiment in self.acceptExperimentIds:
-                                            self.acceptExperimentIds.remove(experiment)
+                        if TABLE in policy[RESOURCES]:
+                            experiments = policy[RESOURCES][TABLE][VALUES]
+                            runs = policy[RESOURCES][COLUMN][VALUES]
+                            for access in accesses:
+                                if access[TYPE] == role and access[IS_ALLOWED]:
+                                    for experiment in experiments:
+                                        if experiment is not None and experiment != '*':
+                                            if DEBUG:
+                                                print('Denying experiment: ', experiment)
+                                            if experiment in self.acceptExperimentIds:
+                                                self.acceptExperimentIds.remove(experiment)
+                                            self.denyExperimentIds.add(experiment)
+                                        elif experiment is not None and experiment == '*':
+                                            self.denyAllExperiments = True
 
     def canAccessExperiment(self, experiment_id):
-        return experiment_id in self.acceptExperimentIds
+        if self.acceptAllExperiments:
+            return experiment_id not in self.denyExperimentIds
+        if self.denyAllExperiments:
+            return experiment_id in self.acceptExperimentIds
+        return return experiment_id in self.acceptExperimentIds
 
     def canAccessRun(self, run_id):
         return run_id in self.acceptRunIds
