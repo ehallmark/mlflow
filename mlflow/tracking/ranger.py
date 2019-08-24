@@ -79,7 +79,7 @@ class MLflowRangerAccess:
                                         if experiment in self.acceptExperimentIds:
                                             self.acceptExperimentIds.remove(experiment)
 
-    def canAccess(self, experiment_id):
+    def canAccessExperiment(self, experiment_id):
         return experiment_id in self.acceptExperimentIds
 
     def canAccessRun(self, run_id):
