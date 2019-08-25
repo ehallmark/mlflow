@@ -45,19 +45,19 @@ class MlflowClient(object):
         self.user = os.environ.get('MLFLOW_RANGER_USER', self.user)
         return self.user
 
-    def ranger_can_authorize_experiment_id(self, experiment_id, role='select'):
+    def ranger_can_authorize_experiment_id(self, experiment_id, role='select', _throw=True):
         rangerAccess = ranger.MLflowRangerAccess(user=self.get_user())
         rangerAccess.sync(role=role) # Place to optimize
         hasAccess = rangerAccess.canAccessExperiment(experiment_id=experiment_id)
-        if not hasAccess:
+        if not hasAccess and _throw:
             raise RangerMLflowAccessException("User [%s] does not have [%s] access on [%s]" % (self.get_user(), role.upper(), 'Experiment %s' % experiment_id))
         return hasAccess
 
-    def ranger_can_authorize_create_experiment(self):
+    def ranger_can_authorize_create_experiment(self, _throw=True):
         rangerAccess = ranger.MLflowRangerAccess(user=self.get_user())
         rangerAccess.sync() # Place to optimize
         hasAccess = rangerAccess.canCreateExperiment()
-        if not hasAccess:
+        if not hasAccess and _throw:
             raise RangerMLflowAccessException("User [%s] does not have [%s] access on [%s]" % (self.get_user(), 'CREATE', 'Experiments'))
         return hasAccess
     def get_run(self, run_id):
@@ -135,7 +135,7 @@ class MlflowClient(object):
         final_view_type = ViewType.ACTIVE_ONLY if view_type is None else view_type
 
         experiments = self.store.list_experiments(view_type=final_view_type)
-        experiments = [exp for exp in experiments if self.ranger_can_authorize_experiment_id(exp.experiment_id)]
+        experiments = [exp for exp in experiments if self.ranger_can_authorize_experiment_id(exp.experiment_id, _throw=False)]
         return experiments
 
     def get_experiment(self, experiment_id):
@@ -373,10 +373,7 @@ class MlflowClient(object):
         """
         if isinstance(experiment_ids, int) or isinstance(experiment_ids, str):
             experiment_ids = [experiment_ids]
-        for experiment_id in experiment_ids:
-            if not self.ranger_can_authorize_experiment_id(experiment_id, 'select'):
-                print("Access denied.")
-                raise
+        experiment_ids = [experiment_id for experiment_id in experiment_ids if self.ranger_can_authorize_experiment_id(experiment_id, 'select', _throw=False)]
         return self.store.search_runs(experiment_ids=experiment_ids, filter_string=filter_string,
                                       run_view_type=run_view_type, max_results=max_results,
                                       order_by=order_by, page_token=page_token)
