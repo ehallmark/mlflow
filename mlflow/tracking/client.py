@@ -17,6 +17,8 @@ from mlflow.store.artifact_repository_registry import get_artifact_repository
 from mlflow.utils.mlflow_tags import MLFLOW_USER
 from mlflow.tracking import ranger
 
+class RangerMLflowAccessException(Exception):
+    pass
 
 class MlflowClient(object):
     """
@@ -46,13 +48,18 @@ class MlflowClient(object):
     def ranger_can_authorize_experiment_id(self, experiment_id, role='select'):
         rangerAccess = ranger.MLflowRangerAccess(user=self.get_user())
         rangerAccess.sync(role=role) # Place to optimize
-        return rangerAccess.canAccessExperiment(experiment_id=experiment_id)
+        hasAccess = rangerAccess.canAccessExperiment(experiment_id=experiment_id)
+        if not hasAccess:
+            raise RangerMLflowAccessException("User [%s] does not have [%s] access on [%s]" (self.get_user(), role.upper(), 'Experiment %s' % experiment_id))
+        return hasAccess
 
     def ranger_can_authorize_create_experiment(self):
         rangerAccess = ranger.MLflowRangerAccess(user=self.get_user())
-        rangerAccess.sync(role=role) # Place to optimize
-        return rangerAccess.canCreateExperiment()
-
+        rangerAccess.sync() # Place to optimize
+        hasAccess = rangerAccess.canCreateExperiment()
+        if not hasAccess:
+            raise RangerMLflowAccessException("User [%s] does not have [%s] access on [%s]" (self.get_user(), 'CREATE', 'Experiments'))
+        return hasAccess
     def get_run(self, run_id):
         """
         Fetch the run from backend store. The resulting :py:class:`Run <mlflow.entities.Run>`
