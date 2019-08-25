@@ -50,7 +50,7 @@ class MlflowClient(object):
         rangerAccess.sync(role=role) # Place to optimize
         hasAccess = rangerAccess.canAccessExperiment(experiment_id=experiment_id)
         if not hasAccess:
-            raise RangerMLflowAccessException("User [%s] does not have [%s] access on [%s]" (self.get_user(), role.upper(), 'Experiment %s' % experiment_id))
+            raise RangerMLflowAccessException("User [%s] does not have [%s] access on [%s]" % (self.get_user(), role.upper(), 'Experiment %s' % experiment_id))
         return hasAccess
 
     def ranger_can_authorize_create_experiment(self):
@@ -58,7 +58,7 @@ class MlflowClient(object):
         rangerAccess.sync() # Place to optimize
         hasAccess = rangerAccess.canCreateExperiment()
         if not hasAccess:
-            raise RangerMLflowAccessException("User [%s] does not have [%s] access on [%s]" (self.get_user(), 'CREATE', 'Experiments'))
+            raise RangerMLflowAccessException("User [%s] does not have [%s] access on [%s]" % (self.get_user(), 'CREATE', 'Experiments'))
         return hasAccess
     def get_run(self, run_id):
         """
